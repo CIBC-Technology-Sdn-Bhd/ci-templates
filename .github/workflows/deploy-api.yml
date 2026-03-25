@@ -109,4 +109,4 @@ jobs:
       - name: Deploy to CapRover
         run: |
           npm install -g caprover
-          caprover deploy -u ${{ inputs.caprover_url }} -p ${{ secrets.CAPROVER_PASSWORD }} -a ${{ inputs.app_name }} -i ${{ inputs.image_name }}:${{ needs.build.outputs.image_tag }}
+          caprover deploy -u "${{ inputs.caprover_url }}" -p "${{ secrets.CAPROVER_PASSWORD }}" -a "${{ inputs.app_name }}" -i "${{ inputs.image_name }}:${{ needs.build.outputs.image_tag }}"
