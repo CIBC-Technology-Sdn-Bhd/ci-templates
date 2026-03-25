@@ -1,0 +1,60 @@
+name: Reusable Build & Deploy for API
+
+on:
+  workflow_call:
+    inputs:
+      app_name:
+        required: true
+        type: string
+      image_name:
+        required: true
+        type: string
+      caprover_url:
+        required: true
+        type: string
+      gitlab_username:
+        required: true
+        type: string
+    secrets:
+      CAPROVER_PASSWORD:
+        required: true
+      GITLAB_TOKEN:
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tag }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set tag
+        id: meta
+        run: echo "tag=${GITHUB_SHA}" >> $GITHUB_OUTPUT
+
+      - name: Login to GitLab Registry
+        run: echo "${{ secrets.GITLAB_TOKEN }}" | docker login registry.gitlab.com \
+              -u "${{ inputs.gitlab_username }}" \
+              --password-stdin
+
+      - name: Build image
+        run: docker build -t ${{ inputs.image_name }}:${{ steps.meta.outputs.tag }} .
+
+      - name: Push image
+        run: docker push ${{ inputs.image_name }}:${{ steps.meta.outputs.tag }}
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Deploy to CapRover
+        run: |
+          npm install -g caprover
+          caprover deploy \
+            --caproverUrl ${{ inputs.caprover_url }} \
+            --caproverPassword ${{ secrets.CAPROVER_PASSWORD }} \
+            --appName ${{ inputs.app_name }} \
+            --imageName ${{ inputs.image_name }}:${{ needs.build.outputs.image_tag }}
