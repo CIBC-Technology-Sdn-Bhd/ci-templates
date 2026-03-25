@@ -36,9 +36,7 @@ jobs:
         id: meta
         run: echo "tag=${GITHUB_SHA}" >> $GITHUB_OUTPUT
       - name: Login to GitLab Registry
-        run: echo "${{ secrets.GITLAB_TOKEN }}" | docker login registry.gitlab.com \
-              -u "${{ inputs.gitlab_username }}" \
-              --password-stdin
+        run: echo "${{ secrets.GITLAB_TOKEN }}" | docker login registry.gitlab.com -u "${{ inputs.gitlab_username }}" --password-stdin
       - name: Build image
         run: docker build -t ${{ inputs.image_name }}:${{ steps.meta.outputs.tag }} .
       - name: Push image
@@ -52,8 +50,4 @@ jobs:
       - name: Deploy to CapRover
         run: |
           npm install -g caprover
-          caprover deploy \
-            --caproverUrl ${{ inputs.caprover_url }} \
-            --caproverPassword ${{ secrets.CAPROVER_PASSWORD }} \
-            --appName ${{ inputs.app_name }} \
-            --imageName ${{ inputs.image_name }}:${{ needs.build.outputs.image_tag }}
+          caprover deploy -u ${{ inputs.caprover_url }} -p ${{ secrets.CAPROVER_PASSWORD }} -a ${{ inputs.app_name }} -i ${{ inputs.image_name }}:${{ needs.build.outputs.image_tag }}
