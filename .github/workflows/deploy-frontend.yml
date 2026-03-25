@@ -48,6 +48,9 @@ on:
       CLOUDFLARE_API_TOKEN:
         description: 'Cloudflare API Token with Pages permissions'
         required: true
+      CLOUDFLARE_ACCOUNT_ID:
+        description: 'Cloudflare Account ID'
+        required: true
       AI_API_KEY:
         description: 'API Key for the AI Review Service'
         required: false
