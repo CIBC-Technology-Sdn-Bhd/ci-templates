@@ -75,7 +75,7 @@ jobs:
       # 🔥 Publish .NET App (from repo root, like Bitbucket)
       - name: Publish .NET App
         run: |
-          dotnet publish ${{ inputs.project_path }} -c Release -o ${{ inputs.publish_output }} -r linux-x64 --self-contained false /p:UseAppHost=false /p:MaxCpuCount=1
+          dotnet publish ${{ inputs.project_path }} -c Release -o ${{ inputs.publish_output }} --self-contained false /p:UseAppHost=false /p:MaxCpuCount=1
 
       # 🔥 Docker Setup + Layer Cache via inline cache
       - name: Set up Docker Buildx
