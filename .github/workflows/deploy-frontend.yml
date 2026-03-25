@@ -81,12 +81,14 @@ jobs:
       - name: Deploy to Cloudflare Pages (Staging)
         if: github.ref_name == inputs.staging-branch
         env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: npx wrangler pages deploy ${{ inputs.build-output-dir }} --project-name=${{ inputs.cf-project-staging }}
 
       - name: Deploy to Cloudflare Pages (Production)
         if: github.ref_name == inputs.production-branch
         env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: npx wrangler pages deploy ${{ inputs.build-output-dir }} --project-name=${{ inputs.cf-project-prod }}
 
