@@ -1,0 +1,164 @@
+name: Reusable AI Code Review
+
+on:
+  workflow_call:
+    inputs:
+      # Runtime configuration
+      node-version:
+        description: 'Node.js version to use'
+        required: false
+        type: string
+        default: '22'
+      review-script-path:
+        description: 'Path to the review script'
+        required: false
+        type: string
+        default: 'review-pr.js'
+      install-command:
+        description: 'Command to install dependencies'
+        required: false
+        type: string
+        default: 'npm ci'
+      install-dependencies:
+        description: 'Run npm ci before executing review script'
+        required: false
+        type: boolean
+        default: false
+      
+      # Enhancement toggles
+      enable-review-cache:
+        description: 'Cache reviews by commit SHA to skip re-reviewing'
+        required: false
+        type: boolean
+        default: true
+      review-cache-ttl-hours:
+        description: 'Cache TTL in hours'
+        required: false
+        type: number
+        default: 24
+      enable-auto-labels:
+        description: 'Auto-apply labels based on review severity'
+        required: false
+        type: boolean
+        default: true
+      enable-status-check:
+        description: 'Report review status as GitHub Check'
+        required: false
+        type: boolean
+        default: true
+      enable-inline-comments:
+        description: 'Post line-specific comments on PR diffs'
+        required: false
+        type: boolean
+        default: true
+      max-inline-comments:
+        description: 'Maximum inline comments to post (avoid spam)'
+        required: false
+        type: number
+        default: 10
+      
+      # AI Configuration
+      qwen-model:
+        description: 'Qwen model to use'
+        required: false
+        type: string
+        default: 'qwen-2.5-coder-32b-instruct'
+      qwen-max-tokens:
+        description: 'Max tokens for Qwen API response'
+        required: false
+        type: number
+        default: 4000
+      qwen-temperature:
+        description: 'Temperature for Qwen API (lower = more deterministic)'
+        required: false
+        type: number
+        default: 0.2
+      
+      # Diff Configuration
+      diff-max-files:
+        description: 'Maximum files to review per PR'
+        required: false
+        type: number
+        default: 15
+      diff-max-chars-per-file:
+        description: 'Max characters per file diff'
+        required: false
+        type: number
+        default: 4000
+      diff-max-total-chars:
+        description: 'Hard limit for entire prompt'
+        required: false
+        type: number
+        default: 35000
+    secrets:
+      GITHUB_TOKEN:
+        description: 'GitHub Token for PR comments (auto-provided)'
+        required: false
+      QWEN_API_KEY:
+        description: 'API Key for Qwen-Coder'
+        required: true
+
+# Permissions inherited from caller, but declared for clarity
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+jobs:
+  ai-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: ${{ inputs.install-dependencies && 'npm' || '' }}
+
+      - name: Install Dependencies
+        if: inputs.install-dependencies
+        run: ${{ inputs.install-command }}
+        continue-on-error: true
+
+      - name: Run AI Code Review
+        env:
+          # GitHub API
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_BASE_BRANCH: ${{ github.base_ref }}
+          GITHUB_REPOSITORY_OWNER: ${{ github.event.repository.owner.login }}
+          GITHUB_REPOSITORY_NAME: ${{ github.event.repository.name }}
+          
+          # Qwen API
+          QWEN_API_KEY: ${{ secrets.QWEN_API_KEY }}
+          QWEN_MODEL: ${{ inputs.qwen-model }}
+          QWEN_MAX_TOKENS: ${{ inputs.qwen-max-tokens }}
+          QWEN_TEMPERATURE: ${{ inputs.qwen-temperature }}
+          
+          # Caching
+          ENABLE_REVIEW_CACHE: ${{ inputs.enable-review-cache }}
+          REVIEW_CACHE_TTL_HOURS: ${{ inputs.review-cache-ttl-hours }}
+          
+          # Labels
+          ENABLE_AUTO_LABELS: ${{ inputs.enable-auto-labels }}
+          
+          # Status Check
+          ENABLE_STATUS_CHECK: ${{ inputs.enable-status-check }}
+          
+          # Inline Comments
+          ENABLE_INLINE_COMMENTS: ${{ inputs.enable-inline-comments }}
+          MAX_INLINE_COMMENTS: ${{ inputs.max-inline-comments }}
+          
+          # Diff limits
+          DIFF_MAX_FILES: ${{ inputs.diff-max-files }}
+          DIFF_MAX_CHARS_PER_FILE: ${{ inputs.diff-max-chars-per-file }}
+          DIFF_MAX_TOTAL_CHARS: ${{ inputs.diff-max-total-chars }}
+        run: node ${{ inputs.review-script-path }}
+        continue-on-error: true # Don't fail pipeline if review fails
