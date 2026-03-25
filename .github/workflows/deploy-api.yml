@@ -22,11 +22,23 @@ on:
       dockerfile_path:
         required: false
         type: string
-        default: "Dockerfile"
-      context_path:
+        default: "WebApi/Dockerfile"
+      project_path:
+        required: false
+        type: string
+        default: "WebApi/WebApi.csproj"
+      publish_output:
+        required: false
+        type: string
+        default: "publish"
+      build_context:
         required: false
         type: string
         default: "."
+      dotnet_version:
+        required: false
+        type: string
+        default: "6.0.x"
     secrets:
       CAPROVER_PASSWORD:
         required: true
@@ -38,17 +50,56 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       image_tag: ${{ steps.meta.outputs.tag }}
+
     steps:
       - uses: actions/checkout@v4
+
       - name: Set tag
         id: meta
         run: echo "tag=${GITHUB_SHA}" >> $GITHUB_OUTPUT
+
+      # 🔥 .NET Setup + NuGet Cache
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ inputs.dotnet_version }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json', '**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      # 🔥 Publish .NET App (from repo root, like Bitbucket)
+      - name: Publish .NET App
+        run: |
+          dotnet publish ${{ inputs.project_path }} -c Release -o ${{ inputs.publish_output }} -r linux-x64 --self-contained false /p:UseAppHost=false /p:MaxCpuCount=1
+
+      # 🔥 Docker Setup + Layer Cache via inline cache
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Login to GitLab Registry
-        run: echo "${{ secrets.GITLAB_TOKEN }}" | docker login registry.gitlab.com -u "${{ inputs.gitlab_username }}" --password-stdin
-      - name: Build image
-        run: docker build -f ${{ inputs.dockerfile_path }} -t ${{ inputs.image_name }}:${{ steps.meta.outputs.tag }} ${{ inputs.context_path }}
-      - name: Push image
-        run: docker push ${{ inputs.image_name }}:${{ steps.meta.outputs.tag }}
+        uses: docker/login-action@v3
+        with:
+          registry: registry.gitlab.com
+          username: ${{ inputs.gitlab_username }}
+          password: ${{ secrets.GITLAB_TOKEN }}
+
+      # 🔥 Build with inline cache (simple & effective)
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ inputs.build_context }}
+          file: ${{ inputs.dockerfile_path }}
+          push: true
+          tags: |
+            ${{ inputs.image_name }}:${{ steps.meta.outputs.tag }}
+            ${{ inputs.image_name }}:latest
+          cache-from: type=registry,ref=${{ inputs.image_name }}:buildcache
+          cache-to: type=registry,ref=${{ inputs.image_name }}:buildcache,mode=max
 
   deploy:
     runs-on: ubuntu-latest
@@ -58,4 +109,8 @@ jobs:
       - name: Deploy to CapRover
         run: |
           npm install -g caprover
-          caprover deploy -u ${{ inputs.caprover_url }} -p ${{ secrets.CAPROVER_PASSWORD }} -a ${{ inputs.app_name }} -i ${{ inputs.image_name }}:${{ needs.build.outputs.image_tag }}
+          caprover deploy \
+            --caproverUrl ${{ inputs.caprover_url }} \
+            --caproverPassword ${{ secrets.CAPROVER_PASSWORD }} \
+            --appName ${{ inputs.app_name }} \
+            --imageName ${{ inputs.image_name }}:${{ needs.build.outputs.image_tag }}
