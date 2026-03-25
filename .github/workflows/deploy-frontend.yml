@@ -1,0 +1,118 @@
+name: Reusable CI/CD and AI Review
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        description: 'Node.js version to use'
+        required: false
+        type: string
+        default: '22'
+      cf-project-staging:
+        description: 'Cloudflare Pages Project Name for Staging'
+        required: true
+        type: string
+      cf-project-prod:
+        description: 'Cloudflare Pages Project Name for Production'
+        required: true
+        type: string
+      staging-branch:
+        description: 'Branch name for Staging deployments'
+        required: true
+        type: string
+      production-branch:
+        description: 'Branch name for Production deployments'
+        required: true
+        type: string
+      enable-ai-review:
+        description: 'Enable AI Code Review on PRs'
+        required: false
+        type: boolean
+        default: true
+      build-command:
+        description: 'Command to build the app'
+        required: false
+        type: string
+        default: 'npm run build'
+      install-command:
+        description: 'Command to install dependencies'
+        required: false
+        type: string
+        default: 'npm ci'
+      build-output-dir:
+        description: 'Build output directory'
+        required: false
+        type: string
+        default: 'dist/spa'
+    secrets:
+      CLOUDFLARE_API_TOKEN:
+        description: 'Cloudflare API Token with Pages permissions'
+        required: true
+      AI_API_KEY:
+        description: 'API Key for the AI Review Service'
+        required: false
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  deploy:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: 
+      name: ${{ github.ref_name == inputs.production-branch && 'Production' || 'Staging' }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: ${{ inputs.install-command }}
+
+      - name: Build Application
+        run: ${{ inputs.build-command }}
+
+      - name: Deploy to Cloudflare Pages (Staging)
+        if: github.ref_name == inputs.staging-branch
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx wrangler pages deploy ${{ inputs.build-output-dir }} --project-name=${{ inputs.cf-project-staging }}
+
+      - name: Deploy to Cloudflare Pages (Production)
+        if: github.ref_name == inputs.production-branch
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx wrangler pages deploy ${{ inputs.build-output-dir }} --project-name=${{ inputs.cf-project-prod }}
+
+  ai-review:
+    if: github.event_name == 'pull_request' && inputs.enable-ai-review
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: ${{ inputs.install-command }}
+
+      - name: Run AI Code Review
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AI_API_KEY: ${{ secrets.AI_API_KEY }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: node review-pr.js
