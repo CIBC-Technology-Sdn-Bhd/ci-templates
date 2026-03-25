@@ -15,10 +15,18 @@ on:
       gitlab_username:
         required: true
         type: string
-      environment_name:        # ← NEW INPUT
+      environment_name:
         required: false
         type: string
         default: ""
+      dockerfile_path:
+        required: false
+        type: string
+        default: "Dockerfile"
+      context_path:
+        required: false
+        type: string
+        default: "."
     secrets:
       CAPROVER_PASSWORD:
         required: true
@@ -38,7 +46,7 @@ jobs:
       - name: Login to GitLab Registry
         run: echo "${{ secrets.GITLAB_TOKEN }}" | docker login registry.gitlab.com -u "${{ inputs.gitlab_username }}" --password-stdin
       - name: Build image
-        run: docker build -t ${{ inputs.image_name }}:${{ steps.meta.outputs.tag }} .
+        run: docker build -f ${{ inputs.dockerfile_path }} -t ${{ inputs.image_name }}:${{ steps.meta.outputs.tag }} ${{ inputs.context_path }}
       - name: Push image
         run: docker push ${{ inputs.image_name }}:${{ steps.meta.outputs.tag }}
 
