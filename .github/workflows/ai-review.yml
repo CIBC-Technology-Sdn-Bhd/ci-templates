@@ -101,9 +101,6 @@ on:
         type: number
         default: 35000
     secrets:
-      GITHUB_TOKEN:
-        description: 'GitHub Token for PR comments (auto-provided)'
-        required: false
       LLM_API_KEY:
         description: 'API Key for LLM Provider (OpenRouter, OpenAI, etc.)'
         required: true
