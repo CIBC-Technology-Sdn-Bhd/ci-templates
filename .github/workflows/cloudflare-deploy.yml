@@ -46,19 +46,19 @@ on:
         default: 'latest'
       staging-base-url:
         description: 'Base URL for Staging'
-        required: true
+        required: false
         type: string
       production-base-url:
         description: 'Base URL for Production'
-        required: true
+        required: false
         type: string
       staging-cdn-url:
         description: 'CDN URL for Staging'
-        required: true
+        required: false
         type: string
       production-cdn-url:
         description: 'CDN URL for Production'
-        required: true
+        required: false
         type: string
     secrets:
       CLOUDFLARE_API_TOKEN:
