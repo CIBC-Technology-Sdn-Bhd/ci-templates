@@ -44,6 +44,22 @@ on:
         required: false
         type: string
         default: 'latest'
+      staging-base-url:
+        description: 'Base URL for Staging'
+        required: true
+        type: string
+      production-base-url:
+        description: 'Base URL for Production'
+        required: true
+        type: string
+      staging-cdn-url:
+        description: 'CDN URL for Staging'
+        required: true
+        type: string
+      production-cdn-url:
+        description: 'CDN URL for Production'
+        required: true
+        type: string
     secrets:
       CLOUDFLARE_API_TOKEN:
         description: 'Cloudflare API Token with Pages permissions'
@@ -75,6 +91,10 @@ jobs:
         run: ${{ inputs.install-command }}
 
       - name: Build Application
+        env:
+          # Determine which URLs to use based on the branch name
+          BASE_URL: ${{ github.ref_name == inputs.staging-branch && inputs.staging-base-url || inputs.production-base-url }}
+          CDN_URL: ${{ github.ref_name == inputs.staging-branch && inputs.staging-cdn-url || inputs.production-cdn-url }}
         run: ${{ inputs.build-command }}
 
       - name: Deploy to Cloudflare Pages (Staging)
